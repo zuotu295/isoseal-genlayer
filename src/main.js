@@ -188,8 +188,9 @@ async function lookup(key, contract) {
 function finalizedResult(tx, id) {
   const receipt = tx.consensus_data?.leader_receipt;
   const leader = Array.isArray(receipt) ? receipt.find((item) => item.mode === 'leader') ?? receipt[0] : receipt;
-  if (typeof leader?.result !== 'string') return null;
-  const bytes = Uint8Array.from(atob(leader.result), (character) => character.charCodeAt(0));
+  const encoded = typeof leader?.result === 'string' ? leader.result : leader?.result?.raw;
+  if (!encoded) return null;
+  const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
   if (bytes[0] === 0) {
     const key = abi.calldata.decode(bytes.slice(1));
     if (typeof key === 'string' && sealKey.test(key) && key.startsWith(id + ':')) return { key };

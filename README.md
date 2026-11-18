@@ -18,6 +18,13 @@ A second seal of the same payload returns the same key. A conflicting payload un
 
 Consensus attests to the version validators could observe at capture time, with USGS as the upstream authority. Temporary source disagreements or failures can prevent a write. An older revision is available through IsoSeal if someone captured it while USGS served it. Studionet is a development network and may reset. IsoSeal is intended for report provenance, with no alerting or claims decisions.
 
+## Live Studionet record
+
+- Contract address — `0x8E8bAE0BbE49Db72f280Fb3615899F68feb6255E`
+- Deployment — [0xdcb89b…e20](https://explorer-studio.genlayer.com/transactions/0xdcb89bb427f8a1fb713cb8f2ad260e7980dd143b5c056a8f4b22a2e2c5332e20)
+- Finalized seal — [0xceb03e…c8e](https://explorer-studio.genlayer.com/transactions/0xceb03e8dc1b288231ce642a4b3e2dfe5c480485e0c3ceec807285fa14edf0c8e)
+- Exact revision — [us7000pn9s:1784316811066](https://zuotu295.github.io/isoseal-genlayer/?seal=us7000pn9s%3A1784316811066)
+
 ## Run and deploy
 
 Use Node.js 24.
