@@ -72,13 +72,36 @@ async function connectWallet() {
   if (!provider?.request) throw new Error('Open this page in a browser with an EIP-1193 wallet.');
   const [selected] = await provider.request({ method: 'eth_requestAccounts' });
   if (!selected) throw new Error('The wallet did not provide an account.');
-  const client = createClient({ chain: studionet, account: selected, provider });
-  await client.connect('studionet');
+  const chainId = '0x' + studionet.id.toString(16);
+  if (BigInt(await provider.request({ method: 'eth_chainId' })) !== BigInt(chainId)) {
+    const switchChain = () => provider.request({
+      method: 'wallet_switchEthereumChain', params: [{ chainId }],
+    });
+    try {
+      await switchChain();
+    } catch (error) {
+      if (error?.code !== 4902 && error?.data?.originalError?.code !== 4902) throw error;
+      await provider.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId,
+          chainName: 'GenLayer Studionet',
+          nativeCurrency: studionet.nativeCurrency,
+          rpcUrls: studionet.rpcUrls.default.http,
+          blockExplorerUrls: ['https://explorer-studio.genlayer.com'],
+        }],
+      });
+      if (BigInt(await provider.request({ method: 'eth_chainId' })) !== BigInt(chainId)) await switchChain();
+    }
+  }
+  if (BigInt(await provider.request({ method: 'eth_chainId' })) !== BigInt(chainId)) {
+    throw new Error('Switch your wallet to GenLayer Studionet.');
+  }
   const [active] = await provider.request({ method: 'eth_accounts' });
   if (active?.toLowerCase() !== selected.toLowerCase()) throw new Error('Wallet account changed. Try again.');
   account = selected;
   showWallet();
-  return client;
+  return createClient({ chain: studionet, account: selected, provider });
 }
 
 window.ethereum?.on?.('accountsChanged', ([active]) => {
