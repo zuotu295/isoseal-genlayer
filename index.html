@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#100e1d">
+    <meta name="description" content="Seal a USGS earthquake revision with GenLayer consensus.">
+    <title>IsoSeal · Earthquake Evidence</title>
+  </head>
+  <body>
+    <div class="ambient" aria-hidden="true"></div>
+    <header class="shell masthead">
+      <a href="./" class="brand"><span class="mark" aria-hidden="true"></span>IsoSeal</a>
+      <div class="header-actions"><span class="network"><i></i> GenLayer Studionet</span><button class="quiet" id="wallet">Connect wallet</button></div>
+    </header>
+    <main class="shell">
+      <section class="hero">
+        <div class="intro">
+          <p class="eyebrow"><span></span> USGS × GENLAYER</p>
+          <h1>When the earth shifts,<br><em>keep the record.</em></h1>
+          <p class="lede">Seal a specific revision of a USGS earthquake report. GenLayer validators independently check the official record so anyone can verify what it said.</p>
+          <a class="source" href="https://earthquake.usgs.gov/earthquakes/map/" target="_blank" rel="noopener noreferrer">Find an event on USGS <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="crystal" aria-hidden="true">
+          <div class="orbit orbit-outer"></div><div class="orbit orbit-inner"></div>
+          <div class="orb"><div class="glint"></div></div><div class="core"></div>
+          <div class="wave"></div>
+        </div>
+      </section>
+      <div class="workspace">
+        <section class="glass controls" aria-labelledby="work-title">
+          <div class="panel-head"><h2 id="work-title">Evidence desk</h2><button id="settings-toggle" class="text-button" aria-expanded="false" aria-controls="settings">Contract settings</button></div>
+          <div id="settings" hidden>
+            <form id="contract-form">
+              <label for="contract">Studionet contract address</label>
+              <div class="input-line"><input id="contract" placeholder="0x…" spellcheck="false" maxlength="42"><button class="quiet">Save</button></div>
+            </form>
+          </div>
+          <form id="evidence-form">
+            <label for="lookup">USGS event ID or seal key</label>
+            <input id="lookup" placeholder="us7000pn9s" maxlength="49" required spellcheck="false" autocomplete="off">
+            <div class="form-actions"><button class="primary" id="seal" type="submit" value="seal">Seal current revision <span aria-hidden="true">↗</span></button><button class="quiet" id="read" type="submit" value="read">Look up seal</button></div>
+          </form>
+          <p id="notice" class="notice" role="status"></p>
+        </section>
+        <section class="glass result" aria-labelledby="result-title">
+          <div class="panel-head"><h2 id="result-title">Finalized evidence</h2><span class="flag" id="record-tag">ON-CHAIN</span></div>
+          <div id="evidence" aria-live="polite"><p class="empty">Look up an event or revision to inspect its sealed measurements and share an exact reference.</p></div>
+        </section>
+      </div>
+      <section class="glass activity" aria-labelledby="activity-title">
+        <div class="panel-head"><h2 id="activity-title">Transaction activity</h2><button class="text-button" id="refresh">Refresh status</button></div>
+        <ol id="transactions" aria-live="polite"></ol>
+      </section>
+    </main>
+    <footer class="shell"><span>IsoSeal</span><span>Official USGS observations · independently checked by GenLayer</span></footer>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "isoseal",
+  "version": "1.0.0",
+  "description": "GenLayer consensus-backed USGS earthquake revision evidence",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build --base=./",
+    "deploy:contract": "node scripts/deploy.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "genlayer-js": "^1.1.8"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
