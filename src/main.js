@@ -12,7 +12,7 @@ const addressPattern = /^0x[0-9a-fA-F]{40}$/;
 const storeKey = 'isoseal-studionet-v1';
 const query = new URLSearchParams(location.search);
 const terminal = new Set(['Finalized', 'Failed', 'Canceled']);
-const explorer = 'https://explorer-studio.genlayer.com/transactions/';
+const explorer = 'https://explorer-studio.genlayer.com/tx/';
 
 let saved = {};
 try {
