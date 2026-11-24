@@ -1,0 +1,3 @@
+IsoSeal sample incident report
+USGS event references: us7000pn9s and us7000m9g4.
+The linked IsoSeal record identifies the exact sealed revisions.

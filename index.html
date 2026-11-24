@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#100e1d">
-    <meta name="description" content="Seal a USGS earthquake revision with GenLayer consensus.">
+    <meta name="description" content="Seal USGS earthquake revisions and verify incident report files with GenLayer.">
     <title>IsoSeal · Earthquake Evidence</title>
   </head>
   <body>
@@ -18,7 +18,7 @@
         <div class="intro">
           <p class="eyebrow"><span></span> USGS × GENLAYER</p>
           <h1>When the earth shifts,<br><em>keep the record.</em></h1>
-          <p class="lede">Seal a specific revision of a USGS earthquake report. GenLayer validators independently check the official record so anyone can verify what it said.</p>
+          <p class="lede">Seal a specific revision of a USGS earthquake report. GenLayer validators independently check the official record. Publish a report fingerprint to cite those exact revisions.</p>
           <a class="source" href="https://earthquake.usgs.gov/earthquakes/map/" target="_blank" rel="noopener noreferrer">Find an event on USGS <span aria-hidden="true">↗</span></a>
         </div>
         <div class="crystal" aria-hidden="true">
@@ -48,6 +48,34 @@
           <div id="evidence" aria-live="polite"><p class="empty">Look up an event or revision to inspect its sealed measurements and share an exact reference.</p></div>
         </section>
       </div>
+      <section class="glass activity" aria-labelledby="reports-title">
+        <div class="panel-head"><h2 id="reports-title">Incident reports</h2></div>
+        <div class="report-grid">
+          <form id="report-publish">
+            <label for="report-keys">Exact seal keys, one per line (2–8)</label>
+            <textarea id="report-keys" rows="4" maxlength="399" required spellcheck="false"></textarea>
+            <label for="report-file">Report file (up to 20 MiB)</label>
+            <p class="empty">Only the file fingerprint and seal keys are published.</p>
+            <input id="report-file" type="file" required>
+            <button class="primary" id="publish-report">Publish report</button>
+          </form>
+          <div>
+            <form id="report-lookup">
+              <label for="report-id">Report ID</label>
+              <input id="report-id" spellcheck="false" maxlength="64" required>
+              <button class="quiet">Look up report</button>
+            </form>
+            <div id="report-record" aria-live="polite"></div>
+            <form id="report-verify" hidden>
+              <label for="verify-file">Verify a local copy</label>
+              <input id="verify-file" type="file" required>
+              <button class="quiet">Compare file</button>
+              <p id="verify-result" role="status"></p>
+            </form>
+          </div>
+        </div>
+        <p id="report-notice" class="notice" role="status"></p>
+      </section>
       <section class="glass activity" aria-labelledby="activity-title">
         <div class="panel-head"><h2 id="activity-title">Transaction activity</h2><button class="text-button" id="refresh">Refresh status</button></div>
         <ol id="transactions" aria-live="polite"></ol>

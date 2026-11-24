@@ -7,6 +7,7 @@ import deployment from './deployment.json';
 const $ = (selector) => document.querySelector(selector);
 const reader = createClient({ chain: studionet });
 const eventId = /^[a-z0-9]{2,32}$/;
+const reportIdPattern = /^[0-9a-f]{64}$/;
 const sealKey = /^[a-z0-9]{2,32}:[1-9][0-9]{0,15}$/;
 const addressPattern = /^0x[0-9a-fA-F]{40}$/;
 const storeKey = 'isoseal-studionet-v1';
@@ -20,8 +21,10 @@ try {
 } catch {
   // A damaged or unavailable cache should not prevent a new lookup.
 }
-const sharedAddress = query.get('contract') || '';
-let address = [sharedAddress, saved.address, deployment.address].find((value) => addressPattern.test(value)) || '';
+const legacySeal = query.has('seal') && !query.has('contract') ? deployment.legacyAddress : '';
+const sharedAddress = query.get('contract') || legacySeal || '';
+const savedAddress = (typeof saved.address === 'string' ? saved.address.toLowerCase() : '') === deployment.legacyAddress.toLowerCase() ? '' : saved.address;
+let address = [sharedAddress, savedAddress, deployment.address].find((value) => addressPattern.test(value)) || '';
 let entries = Array.isArray(saved.entries) ? saved.entries : [];
 let account = '';
 let busy = false;
@@ -166,6 +169,19 @@ function showRecord(raw, contract) {
       message(url.href);
     }
   });
+  if (contract.toLowerCase() === address.toLowerCase() && contract.toLowerCase() !== deployment.legacyAddress.toLowerCase()) {
+    const cite = element('button', 'Add to report', 'text-button');
+    cite.type = 'button';
+    cite.addEventListener('click', () => {
+      const field = $('#report-keys');
+      const keys = field.value.trim().split(/\s+/).filter(Boolean);
+      if (keys.includes(key)) return message('This seal is already in the report.');
+      if (keys.length >= 8) return message('A report can cite up to eight seals.', true);
+      field.value = [...keys, key].join('\n');
+      message('Seal added to the incident report.');
+    });
+    buttons.append(cite);
+  }
   buttons.append(share, link('USGS source ↗', 'https://earthquake.usgs.gov/earthquakes/eventpage/' + record.id, 'source'));
   target.replaceChildren(header, details, element('code', key, 'seal-key'), buttons);
 }
@@ -184,8 +200,9 @@ function renderActivity() {
     summary.append(element('strong', entry.id), element('small', entry.detail || entry.hash));
     row.append(status, summary, link('Explorer ↗', explorer + entry.hash, 'source'));
     if (entry.key) {
-      const open = element('button', 'View seal', 'text-button');
+      const open = element('button', entry.kind === 'report' ? 'View report' : 'View seal', 'text-button');
       open.addEventListener('click', async () => {
+        if (entry.kind === 'report') return openReport(entry.key, entry.address);
         $('#lookup').value = entry.key;
         await lookup(entry.key, entry.address);
       });
@@ -208,15 +225,17 @@ async function lookup(key, contract) {
   }
 }
 
-function finalizedResult(tx, id) {
+function finalizedResult(tx, entry) {
   const receipt = tx.consensus_data?.leader_receipt;
   const leader = Array.isArray(receipt) ? receipt.find((item) => item.mode === 'leader') ?? receipt[0] : receipt;
   const encoded = typeof leader?.result === 'string' ? leader.result : leader?.result?.raw;
   if (!encoded) return null;
   const bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0));
-  if (bytes[0] === 0) {
+  if (bytes[0] === 0 && leader.execution_result === 'SUCCESS') {
     const key = abi.calldata.decode(bytes.slice(1));
-    if (typeof key === 'string' && sealKey.test(key) && key.startsWith(id + ':')) return { key };
+    if (typeof key === 'string' && (entry.kind === 'report'
+      ? reportIdPattern.test(key)
+      : sealKey.test(key) && key.startsWith(entry.id + ':'))) return { key };
   }
   const detail = [1, 2].includes(bytes[0]) && new TextDecoder().decode(bytes.slice(1));
   return { error: detail || 'Consensus did not return a seal key.' };
@@ -229,7 +248,7 @@ async function update(entry) {
     const state = tx.statusName || tx.status_name || transactionsStatusNumberToName[tx.status] || String(tx.status);
     entry.detail = '';
     if (state === 'FINALIZED') {
-      const result = finalizedResult(tx, entry.id);
+      const result = finalizedResult(tx, entry);
       if (!result) {
         entry.status = 'Checking result';
         entry.detail = 'Finalized receipt has not exposed its execution result.';
@@ -237,7 +256,9 @@ async function update(entry) {
         entry.status = 'Failed';
         entry.detail = result.error;
       } else {
-        const snapshot = await readSeal(entry.address, result.key);
+        const snapshot = entry.kind === 'report'
+          ? await readReport(entry.address, result.key)
+          : await readSeal(entry.address, result.key);
         if (!snapshot) throw new Error('The exact snapshot is not readable yet.');
         entry.status = 'Finalized';
         entry.key = result.key;
@@ -280,6 +301,9 @@ $('#contract-form').addEventListener('submit', (event) => {
   }
   address = next;
   ++viewVersion;
+  clearReport();
+  $('#report-keys').value = '';
+  reportNotice('Contract address updated.');
   $('#evidence').replaceChildren(element('p', 'Look up a seal on this contract.', 'empty'));
   cache();
   message('Studionet contract address saved.');
@@ -305,6 +329,7 @@ $('#evidence-form').addEventListener('submit', async (event) => {
     const client = await connectWallet();
     const hash = await client.writeContract({
       address: contract, functionName: 'seal', args: [key], value: 0n, leaderOnly: false,
+      fees: await studyFees(client),
     });
     entries.unshift({ hash, id: key, address: contract, status: 'Submitted' });
     cache();
@@ -327,4 +352,158 @@ const sharedSeal = query.get('seal') || '';
 if (address && sealKey.test(sharedSeal)) {
   $('#lookup').value = sharedSeal;
   void lookup(sharedSeal, address);
+}
+
+let reportVersion = 0;
+let verificationVersion = 0;
+let loadedReport = null;
+
+function reportNotice(text) {
+  $('#report-notice').textContent = text;
+}
+
+function clearReport() {
+  ++reportVersion;
+  loadedReport = null;
+  $('#report-record').replaceChildren();
+  $('#report-verify').hidden = true;
+  $('#report-verify').reset();
+  $('#verify-result').textContent = '';
+}
+
+function evidenceUrl(parameter, value, contract) {
+  const url = new URL(location.pathname, location.href);
+  url.search = new URLSearchParams({ [parameter]: value, contract });
+  return url.href;
+}
+
+function readReport(contract, id) {
+  return reader.readContract({
+    address: contract,
+    functionName: 'get_report',
+    args: [id],
+    transactionHashVariant: TransactionHashVariant.LATEST_FINAL,
+  });
+}
+
+async function openReport(id, contract) {
+  clearReport();
+  const version = reportVersion;
+  $('#report-id').value = id;
+  reportNotice('Reading finalized report…');
+  try {
+    const raw = await readReport(contract, id);
+    if (version !== reportVersion) return;
+    if (!raw) return reportNotice('No finalized report found.');
+    const record = JSON.parse(raw);
+    if (typeof record.document_sha256 !== 'string' || !reportIdPattern.test(record.document_sha256) ||
+      !Array.isArray(record.revision_keys) || record.revision_keys.length < 2 || record.revision_keys.length > 8 ||
+      !record.revision_keys.every((key) => typeof key === 'string' && sealKey.test(key))) {
+      throw new Error('Invalid report manifest.');
+    }
+    const references = element('ul', '');
+    for (const key of record.revision_keys) {
+      const item = element('li', '');
+      item.append(link(key, evidenceUrl('seal', key, contract)));
+      references.append(item);
+    }
+    const copy = element('button', 'Copy verification link', 'quiet');
+    copy.type = 'button';
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(evidenceUrl('report', id, contract));
+        reportNotice('Verification link copied.');
+      } catch (error) {
+        reportNotice(describeError(error));
+      }
+    });
+    $('#report-record').append(element('p', 'File SHA-256: ' + record.document_sha256), references, copy);
+    loadedReport = record;
+    $('#report-verify').hidden = false;
+    reportNotice('Finalized report loaded.');
+  } catch (error) {
+    if (version === reportVersion) reportNotice(describeError(error));
+  }
+}
+
+async function fileDigest(file) {
+  if (file.size > 20 * 1024 * 1024) throw new Error('Choose a file up to 20 MiB.');
+  const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+$('#report-lookup').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const id = $('#report-id').value.trim().toLowerCase();
+  if (!reportIdPattern.test(id)) return reportNotice('Enter a 64-character report ID.');
+  void openReport(id, address);
+});
+
+$('#verify-file').addEventListener('change', () => {
+  ++verificationVersion;
+  $('#verify-result').textContent = '';
+});
+
+$('#report-verify').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const record = loadedReport;
+  if (!record) return;
+  const version = ++verificationVersion;
+  try {
+    const digest = await fileDigest($('#verify-file').files[0]);
+    if (record === loadedReport && version === verificationVersion) {
+      $('#verify-result').textContent = digest === record.document_sha256
+        ? 'Match. This file has the registered SHA-256.'
+        : 'Mismatch. This file differs from the registered report.';
+    }
+  } catch (error) {
+    if (record === loadedReport && version === verificationVersion) $('#verify-result').textContent = describeError(error);
+  }
+});
+
+$('#report-publish').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = $('#publish-report');
+  if (button.disabled) return;
+  const contract = address;
+  const keys = $('#report-keys').value.trim().toLowerCase().split(/\s+/);
+  if (keys.length < 2 || keys.length > 8 || new Set(keys).size !== keys.length ||
+    !keys.every((key) => sealKey.test(key))) {
+    return reportNotice('Enter two to eight distinct exact seal keys.');
+  }
+  button.disabled = true;
+  try {
+    const digest = await fileDigest($('#report-file').files[0]);
+    if (contract.toLowerCase() === deployment.legacyAddress.toLowerCase()) {
+      throw new Error('Switch Contract settings to the current IsoSeal deployment to publish a report.');
+    }
+    await readReport(contract, '0'.repeat(64));
+    const snapshots = await Promise.all(keys.map((key) => readSeal(contract, key)));
+    if (snapshots.some((snapshot) => !snapshot)) throw new Error('Every revision must already be sealed on this contract.');
+    reportNotice('Approve the report transaction and estimated test GEN fee in your wallet…');
+    const client = await connectWallet();
+    const hash = await client.writeContract({
+      address: contract, functionName: 'publish_report', args: [digest, keys], value: 0n, leaderOnly: false,
+      fees: await studyFees(client),
+    });
+    entries.unshift({ hash, id: 'Incident report', kind: 'report', address: contract, status: 'Submitted' });
+    cache();
+    renderActivity();
+    reportNotice('Report submitted. Follow its status in Transaction activity.');
+    void refresh();
+  } catch (error) {
+    reportNotice(describeError(error));
+  } finally {
+    button.disabled = false;
+  }
+});
+
+const sharedReport = query.get('report') || '';
+if (address && reportIdPattern.test(sharedReport)) void openReport(sharedReport, address);
+
+async function studyFees(client) {
+  const { distribution, feeValue } = await client.estimateTransactionFees({
+    leaderTimeunitsAllocation: 100n, validatorTimeunitsAllocation: 200n, rotations: [0n],
+  });
+  return { distribution, feeValue };
 }
